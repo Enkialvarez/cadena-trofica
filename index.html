@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Interactivo - Red Trófica Antártica</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(180deg, #87CEEB 0%, #4A90A4 30%, #2E5A7C 70%, #8B7355 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Nubes animadas */
+        .cloud {
+            position: absolute;
+            background: rgba(255,255,255,0.7);
+            border-radius: 50px;
+            animation: floatCloud linear infinite;
+        }
+        .cloud::before, .cloud::after {
+            content: '';
+            position: absolute;
+            background: rgba(255,255,255,0.7);
+            border-radius: 50%;
+        }
+        .cloud1 { width: 120px; height: 40px; top: 8%; left: -150px; animation-duration: 25s; }
+        .cloud1::before { width: 50px; height: 50px; top: -25px; left: 20px; }
+        .cloud1::after { width: 60px; height: 40px; top: -15px; left: 50px; }
+        .cloud2 { width: 100px; height: 35px; top: 5%; left: -120px; animation-duration: 30s; animation-delay: 8s; }
+        .cloud2::before { width: 40px; height: 40px; top: -20px; left: 15px; }
+        .cloud2::after { width: 50px; height: 35px; top: -12px; left: 40px; }
+
+        @keyframes floatCloud {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(calc(100vw + 200px)); }
+        }
+
+        /* Título */
+        .title {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            color: #E74C3C;
+            font-size: 2rem;
+            font-weight: 800;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+
+        /* Botón siguiente */
+        .btn-siguiente {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: #2C3E50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-siguiente:hover {
+            background: #34495E;
+            transform: scale(1.05);
+        }
+
+        /* Contenedor principal */
+        .ecosystem {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* SVG para flechas animadas */
+        #arrowCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+            pointer-events: none;
+        }
+
+        /* Organismos */
+        .organism {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            z-index: 10;
+            transition: transform 0.3s;
+        }
+        .organism:hover {
+            transform: scale(1.15);
+            z-index: 20;
+        }
+        .organism .icon {
+            font-size: 3.5rem;
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.3));
+            transition: filter 0.3s;
+        }
+        .organism:hover .icon {
+            filter: drop-shadow(0 0 15px rgba(255,255,255,0.6));
+        }
+        .organism .label {
+            margin-top: 5px;
+            color: #2C3E50;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-align: center;
+            background: rgba(255,255,255,0.85);
+            padding: 3px 10px;
+            border-radius: 12px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        /* Posiciones de organismos (aproximadas a la imagen) */
+        .fitoplancton { left: 3%; bottom: 28%; }
+        .kril { left: 22%; bottom: 38%; }
+        .pinguino { left: 6%; top: 18%; }
+        .merluza { left: 12%; bottom: 5%; }
+        .sepia { left: 48%; bottom: 35%; }
+        .ballena { left: 42%; bottom: 0%; }
+        .albatros { left: 45%; top: 5%; }
+        .foca-leopardo { right: 18%; top: 15%; }
+        .foca-weddell { right: 12%; bottom: 10%; }
+        .orca { right: 3%; bottom: 32%; }
+
+        /* Indicador de nivel trófico */
+        .trophic-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .badge-producer { background: #27AE60; }
+        .badge-primary { background: #F39C12; }
+        .badge-secondary { background: #E67E22; }
+        .badge-tertiary { background: #C0392B; }
+        .badge-apice { background: #8E44AD; }
+
+        /* Panel de información */
+        .info-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(120%);
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            z-index: 200;
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .info-panel.active {
+            transform: translateX(-50%) translateY(0);
+        }
+        .info-panel h3 {
+            color: #2C3E50;
+            font-size: 1.3rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .info-panel p {
+            color: #555;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .info-panel .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s;
+        }
+        .info-panel .close-btn:hover { color: #E74C3C; }
+        .info-panel .diet-tags {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .diet-tag {
+            background: #E8F4FD;
+            color: #2980B9;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .predator-tag {
+            background: #FDEDEC;
+            color: #C0392B;
+        }
+
+        /* Panel de controles */
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,0.9);
+            color: #2C3E50;
+            font-size: 1.3rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .control-btn:hover {
+            transform: scale(1.1);
+            background: white;
+        }
+        .control-btn.active {
+            background: #3498DB;
+            color: white;
+        }
+
+        /* Hielos decorativos */
+        .iceberg {
+            position: absolute;
+            background: linear-gradient(135deg, #E8F4F8 0%, #B8D4E3 50%, #D6EAF0 100%);
+            border-radius: 50% 50% 10% 10%;
+            opacity: 0.85;
+            z-index: 2;
+        }
+        .iceberg1 {
+            width: 280px;
+            height: 100px;
+            left: -2%;
+            top: 14%;
+            transform: rotate(-3deg);
+        }
+        .iceberg2 {
+            width: 350px;
+            height: 120px;
+            right: -3%;
+            top: 10%;
+            transform: rotate(2deg);
+        }
+        .iceberg3 {
+            width: 200px;
+            height: 70px;
+            left: 0%;
+            bottom: 18%;
+            transform: rotate(-5deg);
+        }
+        .iceberg4 {
+            width: 250px;
+            height: 90px;
+            right: 0%;
+            bottom: 15%;
+            transform: rotate(4deg);
+        }
+
+        /* Animación de flotación */
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+            50% { transform: translateY(-8px) rotate(var(--r, 0deg)); }
+        }
+        .organism {
+            animation: float 4s ease-in-out infinite;
+        }
+        .fitoplancton { --r: 0deg; animation-delay: 0s; }
+        .kril { --r: 0deg; animation-delay: 0.5s; }
+        .pinguino { --r: 0deg; animation-delay: 1s; }
+        .merluza { --r: 0deg; animation-delay: 1.5s; }
+        .sepia { --r: 0deg; animation-delay: 2s; }
+        .ballena { --r: 0deg; animation-delay: 2.5s; }
+        .albatros { --r: 0deg; animation-delay: 0.3s; }
+        .foca-leopardo { --r: 0deg; animation-delay: 0.8s; }
+        .foca-weddell { --r: 0deg; animation-delay: 1.3s; }
+        .orca { --r: 0deg; animation-delay: 1.8s; }
+
+        /* Indicador de energía */
+        .energy-bar {
+            position: fixed;
+            top: 70px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 12px 16px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            z-index: 100;
+        }
+        .energy-bar h4 {
+            font-size: 0.8rem;
+            color: #7F8C8D;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .energy-level {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        .energy-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .organism .icon { font-size: 2.5rem; }
+            .organism .label { font-size: 0.7rem; }
+            .title { font-size: 1.3rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ecosystem">
+        <!-- Nubes -->
+        <div class="cloud cloud1"></div>
+        <div class="cloud cloud2"></div>
+
+        <!-- Título -->
+        <div class="title">🌊 Red Trófica Antártica</div>
+
+        <!-- Botón siguiente -->
+        <button class="btn-siguiente" onclick="alert('¡Continúa con la siguiente actividad!')">
+            SIGUIENTE <span style="font-size:1.2rem">›</span>
+        </button>
+
+        <!-- Barra de energía -->
+        <div class="energy-bar">
+            <h4>Niveles Tróficos</h4>
+            <div class="energy-level"><span class="energy-dot" style="background:#27AE60"></span> Productor</div>
+            <div class="energy-level"><span class="energy-dot" style="background:#F39C12"></span> Primario</div>
+            <div class="energy-level"><span class="energy-dot" style="background:#E67E22"></span> Secundario</div>
+            <div class="energy-level"><span class="energy-dot" style="background:#C0392B"></span> Terciario</div>
+            <div class="energy-level"><span class="energy-dot" style="background:#8E44AD"></span> Ápice</div>
+        </div>
+
+        <!-- Icebergs -->
+        <div class="iceberg iceberg1"></div>
+        <div class="iceberg iceberg2"></div>
+        <div class="iceberg iceberg3"></div>
+        <div class="iceberg iceberg4"></div>
+
+        <!-- SVG para flechas animadas -->
+        <svg id="arrowCanvas"></svg>
+
+        <!-- Organismos -->
+        <div class="organism fitoplancton" data-name="Fitoplancton" data-level="producer"
+             data-desc="Microorganismos fotosintéticos que forman la base de la cadena alimentaria antártica. Convierten la energía solar en materia orgánica."
+             data-diet="Fotosíntesis" data-predators="Krill, Pingüino emperador, Merluza antártica, Ballena yubarta">
+            <div class="icon">🦠</div>
+            <span class="trophic-badge badge-producer">P</span>
+            <div class="label">Fitoplancton</div>
+        </div>
+
+        <div class="organism kril" data-name="Krill" data-level="primary"
+             data-desc="Pequeños crustáceos que se alimentan de fitoplancton. Son el eslabón más importante de la red alimentaria antártica, conectando productores con consumidores superiores."
+             data-diet="Fitoplancton" data-predators="Pingüino emperador, Albatros, Sepia, Merluza antártica, Ballena yubarta, Foca de Weddell">
+            <div class="icon">🦐</div>
+            <span class="trophic-badge badge-primary">1°</span>
+            <div class="label">Krill</div>
+        </div>
+
+        <div class="organism pinguino" data-name="Pingüino emperador" data-level="secondary"
+             data-desc="El pingüino más grande del mundo. Se alimenta principalmente de krill, peces y calamares. Es una especie emblemática de la Antártida."
+             data-diet="Krill, Merluza antártica" data-predators="Foca leopardo, Orca">
+            <div class="icon">🐧</div>
+            <span class="trophic-badge badge-secondary">2°</span>
+            <div class="label">Pingüino emperador</div>
+        </div>
+
+        <div class="organism merluza" data-name="Merluza antártica" data-level="secondary"
+             data-desc="Pez demersal que habita las aguas frías antárticas. Se alimenta de krill y otros organismos pequeños, siendo presa de depredadores mayores."
+             data-diet="Krill, Fitoplancton" data-predators="Pingüino emperador, Sepia, Foca de Weddell, Foca leopardo, Orca">
+            <div class="icon">🐟</div>
+            <span class="trophic-badge badge-secondary">2°</span>
+            <div class="label">Merluza antártica</div>
+        </div>
+
+        <div class="organism sepia" data-name="Sepia" data-level="secondary"
+             data-desc="Cefalópodo que habita las aguas antárticas. Se alimenta de peces y krill, y es presa de focas y ballenas."
+             data-diet="Krill, Merluza antártica" data-predators="Albatros, Foca leopardo, Foca de Weddell, Orca">
+            <div class="icon">🦑</div>
+            <span class="trophic-badge badge-secondary">2°</span>
+            <div class="label">Sepia</div>
+        </div>
+
+        <div class="organism ballena" data-name="Ballena yubarta" data-level="secondary"
+             data-desc="Ballena barbada que migra miles de kilómetros para alimentarse en verano antártico. Consume enormes cantidades de krill mediante filtración."
+             data-diet="Krill" data-predators="Orca">
+            <div class="icon">🐋</div>
+            <span class="trophic-badge badge-secondary">2°</span>
+            <div class="label">Ballena yubarta</div>
+        </div>
+
+        <div class="organism albatros" data-name="Albatros" data-level="tertiary"
+             data-desc="Ave marina de gran envergadura que vuela sobre los océanos del sur. Se alimenta de peces, calamares y krill, y es una de las aves más longevas."
+             data-diet="Krill, Sepia" data-predators="Foca leopardo, Orca">
+            <div class="icon">🕊️</div>
+            <span class="trophic-badge badge-tertiary">3°</span>
+            <div class="label">Albatros</div>
+        </div>
+
+        <div class="organism foca-leopardo" data-name="Foca leopardo" data-level="tertiary"
+             data-desc="Una de las focas más grandes de la Antártida. Depredador oportunista que se alimenta de pingüinos, peces y otras focas."
+             data-diet="Pingüino emperador, Albatros, Sepia, Merluza antártica" data-predators="Orca">
+            <div class="icon">🦭</div>
+            <span class="trophic-badge badge-tertiary">3°</span>
+            <div class="label">Foca leopardo</div>
+        </div>
+
+        <div class="organism foca-weddell" data-name="Foca de Weddell" data-level="tertiary"
+             data-desc="Foca nativa de la Antártida que vive cerca de la costa. Se alimenta principalmente de peces y calamares bajo el hielo."
+             data-diet="Krill, Sepia, Merluza antártica" data-predators="Foca leopardo, Orca">
+            <div class="icon">🦭</div>
+            <span class="trophic-badge badge-tertiary">3°</span>
+            <div class="label">Foca de Weddell</div>
+        </div>
+
+        <div class="organism orca" data-name="Orca" data-level="apex"
+             data-desc="Depredador tope (apice) del ecosistema antártico. Cazan en grupos coordinados y se alimentan de focas, ballenas y pingüinos."
+             data-diet="Pingüino emperador, Albatros, Foca leopardo, Foca de Weddell, Ballena yubarta, Sepia, Merluza antártica"
+             data-predators="Ninguno (Ápice)">
+            <div class="icon">🐬</div>
+            <span class="trophic-badge badge-apice">A</span>
+            <div class="label">Orca</div>
+        </div>
+
+        <!-- Panel de información -->
+        <div class="info-panel" id="infoPanel">
+            <button class="close-btn" onclick="closePanel()">&times;</button>
+            <h3 id="infoTitle">Organismo</h3>
+            <p id="infoDesc">Descripción...</p>
+            <div class="diet-tags" id="dietTags"></div>
+        </div>
+
+        <!-- Controles -->
+        <div class="controls">
+            <button class="control-btn active" id="btnFlow" title="Mostrar flujo de energía" onclick="toggleFlow()">⚡</button>
+            <button class="control-btn" id="btnPause" title="Pausar/Reanudar" onclick="togglePause()">⏸</button>
+            <button class="control-btn" title="Reiniciar animación" onclick="location.reload()">🔄</button>
+        </div>
+    </div>
+
+    <script>
+        // ========== CONFIGURACIÓN DE CONEXIONES TRÓFICAS ==========
+        // Cada conexión: {from: 'clase_origen', to: 'clase_destino'}
+        const connections = [
+            // Fitoplancton -> Consumidores primarios
+            {from: 'fitoplancton', to: 'kril'},
+            {from: 'fitoplancton', to: 'pinguino'},
+            {from: 'fitoplancton', to: 'merluza'},
+            {from: 'fitoplancton', to: 'ballena'},
+
+            // Krill -> Consumidores
+            {from: 'kril', to: 'pinguino'},
+            {from: 'kril', to: 'albatros'},
+            {from: 'kril', to: 'sepia'},
+            {from: 'kril', to: 'merluza'},
+            {from: 'kril', to: 'ballena'},
+            {from: 'kril', to: 'foca-weddell'},
+
+            // Merluza -> Consumidores
+            {from: 'merluza', to: 'pinguino'},
+            {from: 'merluza', to: 'sepia'},
+            {from: 'merluza', to: 'foca-weddell'},
+            {from: 'merluza', to: 'foca-leopardo'},
+            {from: 'merluza', to: 'orca'},
+
+            // Sepia -> Consumidores
+            {from: 'sepia', to: 'albatros'},
+            {from: 'sepia', to: 'foca-leopardo'},
+            {from: 'sepia', to: 'foca-weddell'},
+            {from: 'sepia', to: 'orca'},
+
+            // Pingüino -> Depredadores
+            {from: 'pinguino', to: 'foca-leopardo'},
+            {from: 'pinguino', to: 'orca'},
+
+            // Albatros -> Depredadores
+            {from: 'albatros', to: 'foca-leopardo'},
+            {from: 'albatros', to: 'orca'},
+
+            // Ballena -> Orca
+            {from: 'ballena', to: 'orca'},
+
+            // Foca de Weddell -> Depredadores
+            {from: 'foca-weddell', to: 'foca-leopardo'},
+            {from: 'foca-weddell', to: 'orca'},
+
+            // Foca leopardo -> Orca
+            {from: 'foca-leopardo', to: 'orca'},
+        ];
+
+        // ========== SISTEMA DE ANIMACIÓN DE FLECHAS ==========
+        const svg = document.getElementById('arrowCanvas');
+        let particles = [];
+        let isPaused = false;
+        let showFlow = true;
+        let animationId;
+
+        function getCenter(element) {
+            const rect = element.getBoundingClientRect();
+            return {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+        }
+
+        function createArrowPath(x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const offset = 40; // distancia desde el centro del organismo
+
+            const startX = x1 + (dx / dist) * offset;
+            const startY = y1 + (dy / dist) * offset;
+            const endX = x2 - (dx / dist) * offset;
+            const endY = y2 - (dy / dist) * offset;
+
+            // Curva suave
+            const midX = (startX + endX) / 2 + (dy / dist) * 15;
+            const midY = (startY + endY) / 2 - (dx / dist) * 15;
+
+            return `M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}`;
+        }
+
+        function initSVG() {
+            svg.setAttribute('width', window.innerWidth);
+            svg.setAttribute('height', window.innerHeight);
+            svg.innerHTML = '';
+
+            // Definir gradiente y marcador de flecha
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#E74C3C" opacity="0.7"/>
+                </marker>
+                <filter id="glow">
+                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            `;
+            svg.appendChild(defs);
+
+            // Dibujar líneas base
+            connections.forEach((conn, i) => {
+                const fromEl = document.querySelector('.' + conn.from);
+                const toEl = document.querySelector('.' + conn.to);
+                if (!fromEl || !toEl) return;
+
+                const from = getCenter(fromEl);
+                const to = getCenter(toEl);
+                const pathData = createArrowPath(from.x, from.y, to.x, to.y);
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', pathData);
+                path.setAttribute('stroke', '#E74C3C');
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('fill', 'none');
+                path.setAttribute('opacity', '0.35');
+                path.setAttribute('marker-end', 'url(#arrowhead)');
+                path.setAttribute('id', 'path-' + i);
+                svg.appendChild(path);
+
+                // Crear partículas para esta conexión
+                for (let p = 0; p < 2; p++) {
+                    particles.push({
+                        pathId: i,
+                        pathData: pathData,
+                        progress: Math.random(),
+                        speed: 0.003 + Math.random() * 0.004,
+                        size: 3 + Math.random() * 3,
+                        color: ['#F1C40F', '#E67E22', '#E74C3C', '#F39C12'][Math.floor(Math.random() * 4)]
+                    });
+                }
+            });
+        }
+
+        function animateParticles() {
+            if (isPaused) {
+                animationId = requestAnimationFrame(animateParticles);
+                return;
+            }
+
+            // Limpiar partículas anteriores
+            const oldParticles = svg.querySelectorAll('.particle');
+            oldParticles.forEach(p => p.remove());
+
+            if (!showFlow) {
+                animationId = requestAnimationFrame(animateParticles);
+                return;
+            }
+
+            particles.forEach(p => {
+                p.progress += p.speed;
+                if (p.progress > 1) p.progress = 0;
+
+                const pathEl = document.getElementById('path-' + p.pathId);
+                if (!pathEl) return;
+
+                const pathLength = pathEl.getTotalLength();
+                const point = pathEl.getPointAtLength(p.progress * pathLength);
+
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', point.x);
+                circle.setAttribute('cy', point.y);
+                circle.setAttribute('r', p.size);
+                circle.setAttribute('fill', p.color);
+                circle.setAttribute('opacity', '0.85');
+                circle.setAttribute('class', 'particle');
+                circle.setAttribute('filter', 'url(#glow)');
+                svg.appendChild(circle);
+            });
+
+            animationId = requestAnimationFrame(animateParticles);
+        }
+
+        // ========== INTERACTIVIDAD ==========
+        const infoPanel = document.getElementById('infoPanel');
+        const infoTitle = document.getElementById('infoTitle');
+        const infoDesc = document.getElementById('infoDesc');
+        const dietTags = document.getElementById('dietTags');
+
+        document.querySelectorAll('.organism').forEach(org => {
+            org.addEventListener('click', function() {
+                const name = this.dataset.name;
+                const desc = this.dataset.desc;
+                const diet = this.dataset.diet;
+                const predators = this.dataset.predators;
+                const level = this.dataset.level;
+
+                infoTitle.innerHTML = this.querySelector('.icon').outerHTML + ' ' + name;
+                infoDesc.textContent = desc;
+
+                dietTags.innerHTML = '';
+
+                // Tag de dieta
+                const dietItems = diet.split(',').map(d => d.trim());
+                dietItems.forEach(item => {
+                    const tag = document.createElement('span');
+                    tag.className = 'diet-tag';
+                    tag.textContent = '🍽️ ' + item;
+                    dietTags.appendChild(tag);
+                });
+
+                // Tag de depredadores
+                const predItems = predators.split(',').map(p => p.trim());
+                predItems.forEach(item => {
+                    const tag = document.createElement('span');
+                    tag.className = 'diet-tag predator-tag';
+                    tag.textContent = '⚠️ Presa de: ' + item;
+                    dietTags.appendChild(tag);
+                });
+
+                infoPanel.classList.add('active');
+
+                // Resaltar conexiones relacionadas
+                highlightConnections(this.classList[1]);
+            });
+        });
+
+        function closePanel() {
+            infoPanel.classList.remove('active');
+            resetHighlights();
+        }
+
+        function highlightConnections(className) {
+            document.querySelectorAll('#arrowCanvas path').forEach((path, i) => {
+                const conn = connections[i];
+                if (conn && (conn.from === className || conn.to === className)) {
+                    path.setAttribute('stroke-width', '4');
+                    path.setAttribute('opacity', '0.9');
+                    path.setAttribute('stroke', '#F1C40F');
+                } else {
+                    path.setAttribute('opacity', '0.1');
+                }
+            });
+
+            setTimeout(resetHighlights, 3000);
+        }
+
+        function resetHighlights() {
+            document.querySelectorAll('#arrowCanvas path').forEach(path => {
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('opacity', '0.35');
+                path.setAttribute('stroke', '#E74C3C');
+            });
+        }
+
+        function toggleFlow() {
+            showFlow = !showFlow;
+            document.getElementById('btnFlow').classList.toggle('active', showFlow);
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            document.getElementById('btnPause').textContent = isPaused ? '▶' : '⏸';
+        }
+
+        // Cerrar panel al hacer clic fuera
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.organism') && !e.target.closest('.info-panel') && !e.target.closest('.control-btn')) {
+                closePanel();
+            }
+        });
+
+        // Redimensionar
+        window.addEventListener('resize', function() {
+            initSVG();
+        });
+
+        // Inicializar
+        window.addEventListener('load', function() {
+            initSVG();
+            animateParticles();
+        });
+    </script>
+</body>
+</html>
